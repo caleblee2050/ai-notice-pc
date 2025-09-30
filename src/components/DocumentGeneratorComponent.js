@@ -1,19 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, Button, TextInput, StyleSheet } from 'react-native';
+import { View, Text, Button, TextInput, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as SMS from 'expo-sms';
 import { GEMINI_API_KEY } from '@env';
 
-const DocumentGeneratorComponent = ({ transcribedText }) => {
+const DocumentGeneratorComponent = ({ transcribedText, recordingHistory = [] }) => {
   const [generatedDocument, setGeneratedDocument] = useState('');
   const [editedDocument, setEditedDocument] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [documentType, setDocumentType] = useState('보고서'); // 기본 문서 유형
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [selectedRecording, setSelectedRecording] = useState(null);
 
-  const generateDocument = async () => {
-    if (!transcribedText) {
+  const generateDocument = async (text = transcribedText) => {
+    if (!text) {
       setError('음성 텍스트가 없습니다. 먼저 음성을 녹음해주세요.');
       return;
     }
@@ -25,13 +26,13 @@ const DocumentGeneratorComponent = ({ transcribedText }) => {
       const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || 'YOUR_API_KEY_HERE');
       const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
-      const prompt = `사용자가 말한 내용을 바탕으로 ${documentType} 형식의 문서를 작성하세요. 내용은 다음과 같습니다: ${transcribedText}. 문서는 명확하고 구조화되게 작성하세요.`;
+      const prompt = `사용자가 말한 내용을 바탕으로 ${documentType} 형식의 문서를 작성하세요. 내용은 다음과 같습니다: ${text}. 문서는 명확하고 구조화되게 작성하세요.`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
-      const text = response.text();
-      setGeneratedDocument(text);
-      setEditedDocument(text); // 초기 편집 텍스트 설정
+      const generatedText = response.text();
+      setGeneratedDocument(generatedText);
+      setEditedDocument(generatedText); // 초기 편집 텍스트 설정
     } catch (error) {
       console.error('문서 생성 오류:', error);
       setError('문서 생성 중 오류가 발생했습니다: ' + error.message);
@@ -71,9 +72,39 @@ const DocumentGeneratorComponent = ({ transcribedText }) => {
     }
   };
 
+  const selectRecordingForDocument = (recording) => {
+    setSelectedRecording(recording);
+    generateDocument(recording.text);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>문서 생성기</Text>
+      
+      {recordingHistory.length > 0 && (
+        <View style={styles.recordingsContainer}>
+          <Text style={styles.subtitle}>저장된 녹음 기록에서 선택:</Text>
+          <ScrollView horizontal style={styles.recordingsScroll}>
+            {recordingHistory.map((recording) => (
+              <TouchableOpacity 
+                key={recording.id} 
+                style={[
+                  styles.recordingItem, 
+                  selectedRecording?.id === recording.id && styles.selectedRecording
+                ]}
+                onPress={() => selectRecordingForDocument(recording)}
+              >
+                <Text style={styles.recordingTime}>{recording.timestamp}</Text>
+                <Text style={styles.recordingPreview}>
+                  {recording.text.length > 30 
+                    ? recording.text.substring(0, 30) + '...' 
+                    : recording.text}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
       
       <View style={styles.inputContainer}>
         <TextInput
@@ -84,8 +115,8 @@ const DocumentGeneratorComponent = ({ transcribedText }) => {
         />
         <Button 
           title={isGenerating ? "생성 중..." : "문서 생성"} 
-          onPress={generateDocument}
-          disabled={isGenerating || !transcribedText}
+          onPress={() => generateDocument()}
+          disabled={isGenerating || (!transcribedText && !selectedRecording)}
         />
       </View>
       
@@ -128,6 +159,40 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#555',
+  },
+  recordingsContainer: {
+    marginBottom: 16,
+  },
+  recordingsScroll: {
+    flexDirection: 'row',
+    maxHeight: 100,
+  },
+  recordingItem: {
+    padding: 10,
+    backgroundColor: '#e6f7ff',
+    borderRadius: 6,
+    marginRight: 10,
+    width: 150,
+    borderWidth: 1,
+    borderColor: '#d1e8ff',
+  },
+  selectedRecording: {
+    backgroundColor: '#bae7ff',
+    borderColor: '#1890ff',
+  },
+  recordingTime: {
+    fontSize: 10,
+    color: '#666',
+    marginBottom: 4,
+  },
+  recordingPreview: {
+    fontSize: 12,
   },
   inputContainer: {
     flexDirection: 'row',

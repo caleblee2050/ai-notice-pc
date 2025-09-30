@@ -11,6 +11,8 @@ const RecordingComponent = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [transcribedText, setTranscribedText] = useState('');
   const [recognition, setRecognition] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [recordingHistory, setRecordingHistory] = useState([]);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -19,10 +21,20 @@ const RecordingComponent = () => {
         const recog = new SpeechRecognition();
         recog.continuous = true;
         recog.interimResults = true;
-        recog.lang = 'en-US';
+        recog.lang = 'ko-KR'; // 한글 인식을 위해 변경
 
         recog.onstart = () => setIsRecording(true);
-        recog.onend = () => setIsRecording(false);
+        recog.onend = () => {
+          setIsRecording(false);
+          // 녹음이 끝나면 기록에 추가
+          if (transcribedText.trim()) {
+            setRecordingHistory(prev => [...prev, {
+              id: Date.now(),
+              text: transcribedText,
+              timestamp: new Date().toLocaleString()
+            }]);
+          }
+        };
         recog.onerror = (e) => console.log('Web Speech Error: ', e.error);
         recog.onresult = (e) => {
           if (e.results.length > 0) {
@@ -36,7 +48,17 @@ const RecordingComponent = () => {
       }
     } else {
       Voice.onSpeechStart = () => setIsRecording(true);
-      Voice.onSpeechEnd = () => setIsRecording(false);
+      Voice.onSpeechEnd = () => {
+        setIsRecording(false);
+        // 녹음이 끝나면 기록에 추가
+        if (transcribedText.trim()) {
+          setRecordingHistory(prev => [...prev, {
+            id: Date.now(),
+            text: transcribedText,
+            timestamp: new Date().toLocaleString()
+          }]);
+        }
+      };
       Voice.onSpeechError = (e) => console.log('Error: ', e.error);
       Voice.onSpeechResults = (e) => setTranscribedText(e.value[0]);
 
@@ -44,15 +66,24 @@ const RecordingComponent = () => {
         Voice.destroy().then(Voice.removeAllListeners);
       };
     }
-  }, []);
+  }, [transcribedText]);
 
-  const startRecording = () => {
+  const startRecording = async () => {
     if (Platform.OS === 'web') {
       if (recognition) {
-        recognition.start();
+        try {
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+          recognition.start();
+        } catch (error) {
+          setErrorMessage('마이크 권한이 거부되었습니다. 브라우저 설정에서 권한을 허용해주세요.');
+          console.error('Microphone permission error:', error);
+        }
       }
     } else {
-      Voice.start('en-US').catch(e => console.error(e));
+      Voice.start('ko-KR').catch(e => { // 한글 인식을 위해 변경
+        setErrorMessage('녹음 시작 오류: ' + e.message);
+        console.error(e);
+      });
     }
   };
 
@@ -69,6 +100,7 @@ const RecordingComponent = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>음성 녹음</Text>
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       <View style={styles.buttonContainer}>
         <Button 
           title={isRecording ? '녹음 중...' : '녹음 시작'} 
@@ -85,7 +117,20 @@ const RecordingComponent = () => {
         <Text style={styles.label}>변환된 텍스트:</Text>
         <Text style={styles.transcribedText}>{transcribedText || '녹음을 시작하면 여기에 텍스트가 표시됩니다.'}</Text>
       </View>
-      <DocumentGeneratorComponent transcribedText={transcribedText} />
+      
+      {recordingHistory.length > 0 && (
+        <View style={styles.historyContainer}>
+          <Text style={styles.label}>녹음 기록:</Text>
+          {recordingHistory.map(item => (
+            <View key={item.id} style={styles.historyItem}>
+              <Text style={styles.historyTimestamp}>{item.timestamp}</Text>
+              <Text style={styles.historyText}>{item.text}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      
+      <DocumentGeneratorComponent transcribedText={transcribedText} recordingHistory={recordingHistory} />
     </View>
   );
 };
@@ -125,6 +170,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     minHeight: 60,
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+  },
+  historyContainer: {
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  historyItem: {
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  historyTimestamp: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  historyText: {
+    fontSize: 14,
+    color: '#333',
   },
 });
 
