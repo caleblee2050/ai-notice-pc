@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # Build stage: install deps and export Expo web build
 FROM node:20-alpine AS builder
 WORKDIR /app
