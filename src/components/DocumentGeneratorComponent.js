@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Button, TextInput, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as SMS from 'expo-sms';
-import { GEMINI_API_KEY } from '@env';
 
 const DocumentGeneratorComponent = ({ transcribedText, recordingHistory = [] }) => {
   const [generatedDocument, setGeneratedDocument] = useState('');
@@ -13,6 +11,14 @@ const DocumentGeneratorComponent = ({ transcribedText, recordingHistory = [] }) 
   const [error, setError] = useState('');
   const [selectedRecording, setSelectedRecording] = useState(null);
 
+  /**
+   * 문서 생성: 서버 프록시(백엔드)로 텍스트를 보내 구조화된 한국어 문서를 생성합니다.
+   * @param {string} [text=transcribedText] - 문서 생성에 사용할 원문 텍스트
+   * @returns {Promise<void>} 생성 결과는 상태로 관리됩니다.
+   * @example
+   * // 프런트엔드에서 호출
+   * await generateDocument('회의 내용 요약 텍스트');
+   */
   const generateDocument = async (text = transcribedText) => {
     if (!text) {
       setError('음성 텍스트가 없습니다. 먼저 음성을 녹음해주세요.');
@@ -23,19 +29,24 @@ const DocumentGeneratorComponent = ({ transcribedText, recordingHistory = [] }) 
     setError('');
     
     try {
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY || 'YOUR_API_KEY_HERE');
-      const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+      const res = await fetch('http://localhost:8000/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, documentType }),
+      });
 
-      const prompt = `사용자가 말한 내용을 바탕으로 ${documentType} 형식의 문서를 작성하세요. 내용은 다음과 같습니다: ${text}. 문서는 명확하고 구조화되게 작성하세요.`;
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error || '문서 생성 요청 실패');
+      }
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const generatedText = response.text();
+      const generatedText = data?.content || '';
       setGeneratedDocument(generatedText);
       setEditedDocument(generatedText); // 초기 편집 텍스트 설정
     } catch (error) {
       console.error('문서 생성 오류:', error);
-      setError('문서 생성 중 오류가 발생했습니다: ' + error.message);
+      const msg = error?.message || '알 수 없는 오류';
+      setError('문서 생성 중 오류가 발생했습니다: ' + msg);
       setGeneratedDocument('');
       setEditedDocument('');
     } finally {
