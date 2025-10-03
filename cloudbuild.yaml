@@ -28,13 +28,13 @@ steps:
         --region ${_REGION}
         --platform managed
         --allow-unauthenticated
-        --set-env-vars GEMINI_API_KEY=$$GEMINI_API_KEY,GEMINI_MODEL=${_GEMINI_MODEL}
+        --set-env-vars GEMINI_API_KEY=$$gemini_api_key,GEMINI_MODEL=${_GEMINI_MODEL}
 
 # Secret Manager → inject GEMINI_API_KEY at build/deploy time
 availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_ID/secrets/GEMINI_API_KEY/versions/latest
-      env: GEMINI_API_KEY
+      env: gemini_api_key
 
 # Record the image in the build so it’s easy to find
 images:
