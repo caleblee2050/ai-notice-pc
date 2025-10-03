@@ -36,7 +36,7 @@ images:
 
 # Default substitutions; can be overridden per-trigger
 substitutions:
-  _REGION: us-central1
-  _REPOSITORY: voice-to-text-app
-  _SERVICE: voice-to-text-app
+  _REGION: asia-northeast3
+  _REPOSITORY: trae-app-images
+  _SERVICE: trae-app-images
   _GEMINI_MODEL: gemini-2.5-flash
