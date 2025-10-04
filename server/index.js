@@ -97,6 +97,6 @@ if (staticDir) {
 }
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`[Server] Gemini proxy server started on http://localhost:${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => { // <--- 여기에 , '0.0.0.0'을 추가합니다.
+   console.log(`[Server] Gemini proxy server started on http://0.0.0.0:${PORT}/`); // 로그도 수정 (선택사항)
+ });
